@@ -1,7 +1,19 @@
 import multiprocessing
-import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import os
+from functools import wraps
+import traceback
+
+def catch_exception(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            data = func(*args, **kwargs)
+            return { 'status': True, 'data': data, 'error': None, 'stack_trace': None }
+        except Exception as e:
+            stack_trace = traceback.format_exc()
+            return { 'status': False, 'data': None, 'error': e, 'stack_trace': stack_trace }
+    return wrapper
+                    
 
 class CounterHandler(BaseHTTPRequestHandler):
     def __init__(self, counters, *args, **kwargs):
@@ -25,11 +37,12 @@ class CounterHandler(BaseHTTPRequestHandler):
         workers =  processed['active_workers']
         num_reqs = processed['posted_requests']
         c_tasks = processed['completed_tasks']
+        crash_tasks = processed['crashed_tasks']
         c_tasks_dur = processed['complete_tasks_duration_sum']
         min_task_duration = processed['min_task_duration']
         max_task_duration = processed['max_task_duration']
+        error_text = processed['error_list']
 
-        
         avg_dur = 0
         min_dur = 0
         max_dur = 0
@@ -42,9 +55,12 @@ class CounterHandler(BaseHTTPRequestHandler):
 Active workers: {workers}        
 Requests submitted: {num_reqs}
 Processed requests: {c_tasks}
+Crashed requests: {crash_tasks} (out of Processed requests)
 Average task duration: {avg_dur} ms
 Minimum task duration: {min_dur} ms
 Maximum task duration: {max_dur} ms
+
+{error_text}
 """
         return msg.encode()
                 
@@ -69,10 +85,13 @@ class Counters:
         self.tasks_counter_lock = None
         self.complete_tasks_duration_sum = None
         self.complete_tasks_counter = None
+        self.crashed_tasks_counter = None
         self.posted_requests = None
         self.active_workers = None
         self.min_task_duration = None 
         self.max_task_duration = None
+        self.error_list = None 
+
         self.report_port = http_port
         
     def create(self, manager):
@@ -80,16 +99,18 @@ class Counters:
         self.tasks_counter_lock = manager.Lock()
         self.complete_tasks_duration_sum = manager.Value('i', 0)
         self.complete_tasks_counter = manager.Value('i', 0)
+        self.crashed_tasks_counter = manager.Value('i', 0)
         self.active_workers = manager.Value('i', 0)
         self.posted_requests = manager.Value('i', 0)
         self.min_task_duration = manager.Value('i', -1) 
         self.max_task_duration = manager.Value('i', 0)
+        self.error_list = manager.list()
             
     def add_posted_requests(self, to_add):
         with self.tasks_counter_lock:
             self.posted_requests.value += to_add
 
-    def inc_completed(self, task_duration):
+    def inc_completed(self, task_duration, res):
         with self.tasks_counter_lock:
             self.complete_tasks_counter.value += 1
             self.complete_tasks_duration_sum.value += int(task_duration)
@@ -98,6 +119,13 @@ class Counters:
                 self.min_task_duration.value = task_duration
             else:
                 self.min_task_duration.value = min(task_duration, self.min_task_duration.value) 
+
+            status = res.get('status')
+            if status is not None and status is False:
+                self.crashed_tasks_counter.value = self.crashed_tasks_counter.value + 1
+                stack = res.get('stack_trace')
+                if stack:
+                    self.error_list.append(stack)
             
             self.max_task_duration.value = max(task_duration, self.max_task_duration.value) 
 
@@ -116,9 +144,11 @@ class Counters:
                 'active_workers': self.active_workers.value,
                 'posted_requests': self.posted_requests.value,
                 'completed_tasks': self.complete_tasks_counter.value,
+                'crashed_tasks': self.crashed_tasks_counter.value,
                 'complete_tasks_duration_sum': self.complete_tasks_duration_sum.value,
                 'min_task_duration': self.min_task_duration.value,
-                'max_task_duration': self.max_task_duration.value
+                'max_task_duration': self.max_task_duration.value,
+                'error_list' : "\n\n".join(self.error_list)
             }
         return ret 
 

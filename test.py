@@ -4,10 +4,17 @@ import multiprocessing
 import os
 import mp
 
+# very important processing stuff comes here.
+# Note: annotated by @mp.catch_exception - that's how we keep track of errors during task execution
+@mp.catch_exception
 def example_worker_task(task): 
-    # very important processing stuff comes here.
     sleep_time = random.uniform(2, 5)
     time.sleep(sleep_time)
+
+    do_crash = random.uniform(1, 20)
+    if do_crash < 2:
+        # crash the party, ocassionally
+        return 1/0
 
 
 # task callback has to conform to the same form:
@@ -30,13 +37,13 @@ def task_cb(task_queue, counters):
         start = time.monotonic_ns()
         
         # the function that does the worker task
-        example_worker_task(task)
+        res = example_worker_task(task)
 
         duration = time.monotonic_ns() - start
         duration_ms = duration // 1000000
 
         task_queue.task_done()
-        counters.inc_completed(duration_ms)
+        counters.inc_completed(duration_ms, res)
 
     print(f"Worker: {os.getpid()} exit worker")
     counters.dec_workers()
