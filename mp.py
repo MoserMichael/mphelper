@@ -29,40 +29,9 @@ class CounterHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/plain")
         self.end_headers()
         #self.wfile.write("Hello world!".encode())
-        self.wfile.write(self.get_report())
+        self.wfile.write(self.counters.get_report().encode())
         #self.wfile.write("Hello world!".encode())
 
-    def get_report(self):
-        processed = self.counters.get_counters()
-        workers =  processed['active_workers']
-        num_reqs = processed['posted_requests']
-        c_tasks = processed['completed_tasks']
-        crash_tasks = processed['crashed_tasks']
-        c_tasks_dur = processed['complete_tasks_duration_sum']
-        min_task_duration = processed['min_task_duration']
-        max_task_duration = processed['max_task_duration']
-        error_text = processed['error_list']
-
-        avg_dur = 0
-        min_dur = 0
-        max_dur = 0
-        if num_reqs != 0:
-            avg_dur = c_tasks_dur // num_reqs
-            min_dur = min_task_duration
-            max_dur = max_task_duration
-
-        msg = f"""
-Active workers: {workers}        
-Requests submitted: {num_reqs}
-Processed requests: {c_tasks}
-Crashed requests: {crash_tasks} (out of Processed requests)
-Average task duration: {avg_dur} ms
-Minimum task duration: {min_dur} ms
-Maximum task duration: {max_dur} ms
-
-{error_text}
-"""
-        return msg.encode()
                 
 def run_server(counters):
     # Use a lambda to pass our shared objects into the handler's __init__
@@ -152,6 +121,38 @@ class Counters:
             }
         return ret 
 
+    def get_report(self):
+        processed = self.get_counters()
+        workers =  processed['active_workers']
+        num_reqs = processed['posted_requests']
+        c_tasks = processed['completed_tasks']
+        crash_tasks = processed['crashed_tasks']
+        c_tasks_dur = processed['complete_tasks_duration_sum']
+        min_task_duration = processed['min_task_duration']
+        max_task_duration = processed['max_task_duration']
+        error_text = processed['error_list']
+
+        avg_dur = 0
+        min_dur = 0
+        max_dur = 0
+        if num_reqs != 0:
+            avg_dur = c_tasks_dur // num_reqs
+            min_dur = min_task_duration
+            max_dur = max_task_duration
+
+        msg = f"""
+Active workers: {workers}        
+Requests submitted: {num_reqs}
+Processed requests: {c_tasks}
+Crashed requests: {crash_tasks} (out of Processed requests)
+Average task duration: {avg_dur} ms
+Minimum task duration: {min_dur} ms
+Maximum task duration: {max_dur} ms
+
+{error_text}
+"""
+        return msg
+
     def get_port(self):
         return self.report_port
 
@@ -189,6 +190,8 @@ class MultiprocessingHelper:
 
         self.http_worker.terminate()            
 
-        print("Main process - all workers finished")
+        print("Main process - all workers finished\nReport:")
+
+        print(self.counters.get_report())
 
 
