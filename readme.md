@@ -22,6 +22,50 @@ python test.py
 ./test.sh
 ```
 
+At the end of the test run, the main process will print a report like that (the same kind of report you get from sending an http request, for querying the status) 
 
+```
+Main process - all workers finished
+Report:
+
+Active workers: 0
+Requests submitted: 100
+Processed requests: 100
+Crashed requests: 4 (out of Processed requests)
+Average task duration: 3461 ms
+Minimum task duration: 2007 ms
+Maximum task duration: 4998 ms
+
+Traceback (most recent call last):
+  File "/Users/mz485f/work/mphelper/mp.py", line 10, in wrapper
+    data = func(*args, **kwargs)
+  File "/Users/mz485f/work/mphelper/test.py", line 17, in example_worker_task
+    return 1/0
+ZeroDivisionError: division by zero
+
+
+Traceback (most recent call last):
+  File "/Users/mz485f/work/mphelper/mp.py", line 10, in wrapper
+    data = func(*args, **kwargs)
+  File "/Users/mz485f/work/mphelper/test.py", line 17, in example_worker_task
+    return 1/0
+ZeroDivisionError: division by zero
+
+
+Traceback (most recent call last):
+  File "/Users/mz485f/work/mphelper/mp.py", line 10, in wrapper
+    data = func(*args, **kwargs)
+  File "/Users/mz485f/work/mphelper/test.py", line 17, in example_worker_task
+    return 1/0
+ZeroDivisionError: division by zero
+
+
+Traceback (most recent call last):
+  File "/Users/mz485f/work/mphelper/mp.py", line 10, in wrapper
+    data = func(*args, **kwargs)
+  File "/Users/mz485f/work/mphelper/test.py", line 17, in example_worker_task
+    return 1/0
+ZeroDivisionError: division by zero
+```
 
 Enjoy!
